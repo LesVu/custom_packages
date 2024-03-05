@@ -12,6 +12,12 @@ jobs:
       - name: checkout
         uses: actions/checkout@v3
 
+      - name: checkout deb repo
+        uses: actions/checkout@v3
+        with:
+          repository: "LesVu/custom_debian_repo"
+          path: "debian"
+
       - name: checkout Neovim
         uses: actions/checkout@v3
         with:
@@ -34,18 +40,18 @@ jobs:
         with:
           path: ~/.ccache
           key: fex-bookworm-arm64-ccache-
-      
+
       - name: Install deps
         run: |
-          apt-get update && apt-get install -q -y \
+          sudo apt-get update && sudo apt-get install -q -y \
           git cmake ninja-build build-essential pkg-config ccache clang llvm lld binfmt-support \
           libsdl2-dev libepoxy-dev libssl-dev python3-setuptools g++-x86-64-linux-gnu \
           libgcc-12-dev-i386-cross libgcc-12-dev-amd64-cross nasm python3-clang \
           libstdc++-12-dev-i386-cross libstdc++-12-dev-amd64-cross libstdc++-12-dev-arm64-cross \
           squashfs-tools squashfuse libc-bin libc6-dev-i386-amd64-cross \
           lib32stdc++-12-dev-amd64-cross apt-utils \
-          && rm -rf /var/lib/apt/lists/*
-      
+          && sudo rm -rf /var/lib/apt/lists/*
+
       - name: Build
         run: |
           mkdir -p artifacts
@@ -65,7 +71,7 @@ jobs:
 
       - name: Move to debian repo
         run: |
-          mv artifacts/*.deb debian/pool
+          mv artifacts/*.deb debian/debian/pool
 
       - name: Import GPG key
         uses: crazy-max/ghaction-import-gpg@v5
@@ -77,7 +83,7 @@ jobs:
 
       - name: Write new package to repo
         run: |
-          cd $GITHUB_WORKSPACE/debian
+          cd $GITHUB_WORKSPACE/debian/debian
           rm Packages || echo "Failed to remove packages file"
           rm Packages.gz || echo "Failed to remove packages.gz file"
           rm Release || echo "Failed to remove release file"
@@ -93,3 +99,4 @@ jobs:
         uses: stefanzweifel/git-auto-commit-action@v4
         with:
           file_pattern: "debian/*"
+          repository: "debian"

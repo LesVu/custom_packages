@@ -5,7 +5,7 @@ ENV LANGUAGE=en_US.UTF-8
 ENV LC_ALL=en_US.UTF-8
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 ENV DEBIAN_FRONTEND=noninteractive
-ENV RUNNER_ALLOW_RUNASROOT=1
+# ENV RUNNER_ALLOW_RUNASROOT=1
 # hadolint ignore=SC2086,DL3015,DL3008,DL3013,SC2015
 RUN echo en_US.UTF-8 UTF-8 >> /etc/locale.gen \
   && apt-get update \
@@ -49,12 +49,15 @@ RUN echo en_US.UTF-8 UTF-8 >> /etc/locale.gen \
   && useradd -mr -d /home/runner -u 1001 -g 121 runner \
   && usermod -aG sudo runner \
   && echo '%sudo ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers \
-  && mkdir /actions-runner
+  && mkdir /actions-runner \
+  && chown runner:runner /actions-runner
+
 WORKDIR /actions-runner
+USER runner
 
 RUN curl -o actions-runner-linux-arm64-2.311.0.tar.gz -L https://github.com/actions/runner/releases/download/v2.311.0/actions-runner-linux-arm64-2.311.0.tar.gz \
   && tar xzf ./actions-runner-linux-arm64-2.311.0.tar.gz && ./bin/installdependencies.sh && mkdir /_work \
-  && ./config.sh --url https://github.com/LesVu/custom-package --token placeholder \
+  && ./config.sh --url https://github.com/LesVu/custom-packages --token placeholder \
       --name "self-runner" \
       --work "/_work/" \
       --labels "${_LABELS}" \

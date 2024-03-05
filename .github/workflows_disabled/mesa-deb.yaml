@@ -12,6 +12,12 @@ jobs:
       - name: checkout
         uses: actions/checkout@v3
 
+      - name: checkout deb repo
+        uses: actions/checkout@v3
+        with:
+          repository: "LesVu/custom_debian_repo"
+          path: "debian"
+
       # - name: checkout mesa and deps
       #   run: |
       #     # git clone --recursive --depth 1 -b libdrm-2.4.117-1 https://salsa.debian.org/xorg-team/lib/libdrm.git
@@ -25,7 +31,7 @@ jobs:
           sudo cat <<EOF > "/etc/apt/sources.list"
           deb-src http://deb.debian.org/debian/ unstable main
           EOF
-          apt-get update && apt-get install -q -y \
+          sudo apt-get update && sudo apt-get install -q -y \
           git build-essential apt-utils git-buildpackage dh-autoreconf quilt dh-ocaml time libz3-dev pbuilder devscripts
           mkdir build-package
           cd build-package
@@ -44,7 +50,7 @@ jobs:
           apt-get update
           EOF
 
-          rm -rf /var/cache/pbuilder/*.cow
+          sudo rm -rf /var/cache/pbuilder/*.cow
 
           sudo cat <<'EOF' > "/etc/pbuilderrc"
           # the hook dir may already be set/populated!
@@ -65,13 +71,13 @@ jobs:
           fi
           EOF
           sudo chmod +x /etc/pbuilder/hook.d/D10apt-ftparchive
-          pbuilder create --distribution bookworm
-          pbuilder execute --save-after-exec ./command.sh
+          sudo pbuilder create --distribution bookworm
+          sudo pbuilder execute --save-after-exec ./command.sh
 
           sudo mkdir -p /var/cache/pbuilder/deps/debian
           sudo cp debian/pool/*.deb /var/cache/pbuilder/deps/debian
-          DIST=bookworm git-pbuilder create --mirror http://deb.debian.org/debian
-          cowbuilder execute --basepath /var/cache/pbuilder/base-bookworm.cow --distribution bookworm --save-after-exec -- ./command.sh
+          DIST=bookworm sudo git-pbuilder create --mirror http://deb.debian.org/debian
+          sudo cowbuilder execute --basepath /var/cache/pbuilder/base-bookworm.cow --distribution bookworm --save-after-exec -- ./command.sh
 
       - name: Build
         run: |
@@ -80,14 +86,14 @@ jobs:
           # pbuilder build spirv-headers*.dsc
           # cp -r /var/cache/pbuilder/result/*.deb /var/cache/pbuilder/deps/debian
 
-          DEPS=debian pbuilder build spirv-llvm-translator-17*.dsc
+          DEPS=debian sudo pbuilder build spirv-llvm-translator-17*.dsc
           sudo cp -r /var/cache/pbuilder/result/*.deb /var/cache/pbuilder/deps/debian
 
           cd mesa-*
           sed -i 's/RUSTICL_ARCHS = amd64 arm64 armel armhf i386 loong64 mips64el powerpc ppc64 ppc64el riscv64 s390x x32/RUSTICL_ARCHS = amd64/' debian/rules
           sed -i 's/bindgen (>= 0.66.1~)/bindgen (>= 0.60.1~)/' debian/control
           sed -i 's/bindgen (>= 0.66.1~)/bindgen (>= 0.60.1~)/' debian/control.in
-          DEPS=debian pdebuild
+          DEPS=debian sudo pdebuild
           cd ..
 
       # cd libdrm
@@ -121,9 +127,9 @@ jobs:
 
       - name: Move to debian repo
         run: |
-          cp build-package/*.deb debian/pool
-          cp /var/cache/pbuilder/result/*.deb debian/pool
-          rm -f debian/pool/*-dbg*.deb
+          cp build-package/*.deb debian/debian/pool
+          cp /var/cache/pbuilder/result/*.deb debian/debian/pool
+          rm -f debian/debian/pool/*-dbg*.deb
 
       - name: Import GPG key
         uses: crazy-max/ghaction-import-gpg@v5
@@ -135,7 +141,7 @@ jobs:
 
       - name: Write new package to repo
         run: |
-          cd $GITHUB_WORKSPACE/debian
+          cd $GITHUB_WORKSPACE/debian/debian
           rm Packages || echo "Failed to remove packages file"
           rm Packages.gz || echo "Failed to remove packages.gz file"
           rm Release || echo "Failed to remove release file"
@@ -150,7 +156,8 @@ jobs:
       - name: Commit and push
         uses: stefanzweifel/git-auto-commit-action@v4
         with:
-          file_pattern: 'debian/*'
+          file_pattern: "debian/*"
+          repository: "debian"
 
       - name: Upload Artifact
         if: failure()

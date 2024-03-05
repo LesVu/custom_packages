@@ -13,6 +13,12 @@ jobs:
       - name: checkout
         uses: actions/checkout@v3
 
+      - name: checkout deb repo
+        uses: actions/checkout@v3
+        with:
+          repository: "LesVu/custom_debian_repo"
+          path: "debian"
+
       - name: Fix
         run: |
           export DEBIAN_FRONTEND=noninteractive
@@ -29,7 +35,7 @@ jobs:
 
       - name: Write new package to repo
         run: |
-          cd $GITHUB_WORKSPACE/debian
+          cd $GITHUB_WORKSPACE/debian/debian
           rm Packages || echo "Failed to remove packages file"
           rm Packages.gz || echo "Failed to remove packages.gz file"
           rm Release || echo "Failed to remove release file"
@@ -44,4 +50,5 @@ jobs:
       - name: Commit and push
         uses: stefanzweifel/git-auto-commit-action@v4
         with:
-          file_pattern: 'debian/*'
+          file_pattern: "debian/*"
+          repository: "debian"

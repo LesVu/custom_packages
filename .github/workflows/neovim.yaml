@@ -12,6 +12,12 @@ jobs:
       - name: checkout
         uses: actions/checkout@v3
 
+      - name: checkout deb repo
+        uses: actions/checkout@v3
+        with:
+          repository: "LesVu/custom_debian_repo"
+          path: "debian"
+
       - name: checkout Neovim
         uses: actions/checkout@v3
         with:
@@ -38,7 +44,7 @@ jobs:
 
       - name: Install Build deps
         run: |
-          apt-get update && apt-get install -q -y \
+          sudo apt-get update && sudo apt-get install -q -y \
           git jq build-essential ccache libtool-bin tar unzip ninja-build gettext cmake unzip \
           software-properties-common curl libunibilium-dev
 
@@ -59,7 +65,7 @@ jobs:
 
       - name: Move to debian repo
         run: |
-          mv artifacts/*.deb debian/pool
+          mv artifacts/*.deb debian/debian/pool
 
       - name: Import GPG key
         uses: crazy-max/ghaction-import-gpg@v5
@@ -71,7 +77,7 @@ jobs:
 
       - name: Write new package to repo
         run: |
-          cd $GITHUB_WORKSPACE/debian
+          cd $GITHUB_WORKSPACE/debian/debian
           rm Packages || echo "Failed to remove packages file"
           rm Packages.gz || echo "Failed to remove packages.gz file"
           rm Release || echo "Failed to remove release file"
@@ -84,6 +90,7 @@ jobs:
           gpg --default-key LesVu --clearsign -o - Release > InRelease || error "failed to sign InRelease with gpg"
 
       - name: Commit and push
-        uses: stefanzweifel/git-auto-commit-action@v4
+        uses: stefanzweifel/git-auto-commit-action@v5
         with:
           file_pattern: "debian/*"
+          repository: "debian"
