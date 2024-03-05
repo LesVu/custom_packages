@@ -20,10 +20,10 @@ jobs:
 
     steps:
       - name: checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: checkout deb repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: "LesVu/custom_debian_repo"
           path: "debian"
@@ -38,7 +38,7 @@ jobs:
         run: mkdir -p ~/.ccache
 
       - name: ccache cache files
-        uses: actions/cache/restore@v3
+        uses: actions/cache/restore@v4
         with:
           path: ~/.ccache
           key: build-bookworm-arm64-ccache-
@@ -136,7 +136,7 @@ jobs:
           file_pattern: "debian/*"
           repository: "debian"
 
-      - uses: actions/cache/save@v3
+      - uses: actions/cache/save@v4
         if: always()
         with:
           path: ~/.ccache
