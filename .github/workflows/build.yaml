@@ -48,8 +48,12 @@ jobs:
         run: |
           export DEBIAN_FRONTEND=noninteractive
           git config --global http.postBuffer 157286400
-          sudo cat <<EOF | sudo tee "/etc/apt/sources.list" >/dev/null 
-          deb-src http://deb.debian.org/debian unstable main
+          sudo cat <<EOF | sudo tee "/etc/apt/sources.list.d/debian_src.sources" >/dev/null
+          Types: deb-src
+          URIs: http://deb.debian.org/debian
+          Suites: unstable
+          omponents: main
+          Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
           EOF
           sudo apt-get update && sudo apt-get install -q -y \
           git build-essential apt-utils git-buildpackage dh-autoreconf quilt dh-ocaml time libz3-dev cowbuilder pbuilder
