@@ -48,7 +48,7 @@ jobs:
         run: |
           export DEBIAN_FRONTEND=noninteractive
           git config --global http.postBuffer 157286400
-          sudo cat <<EOF > "/etc/apt/sources.list"
+          sudo cat <<EOF | sudo tee "/etc/apt/sources.list" >/dev/null 
           deb-src http://deb.debian.org/debian unstable main
           EOF
           sudo apt-get update && sudo apt-get install -q -y \
@@ -57,7 +57,7 @@ jobs:
           cd build-package
           apt-get source ${{ inputs.package }}
           cd ..
-          sudo cat <<'EOF' > "/etc/pbuilderrc"
+          sudo cat <<'EOF' | sudo tee "/etc/pbuilderrc" >/dev/null 
           # the hook dir may already be set/populated!
           HOOKDIR="/etc/pbuilder/hook.d"
           if [ -n "$DEPS" ] ; then
@@ -66,7 +66,7 @@ jobs:
           fi
           EOF
           sudo mkdir -p /etc/pbuilder/hook.d/
-          sudo cat <<'EOF' > "/etc/pbuilder/hook.d/D10apt-ftparchive"
+          sudo cat <<'EOF' | sudo tee "/etc/pbuilder/hook.d/D10apt-ftparchive" >/dev/null 
           DEPSPATH="$DEPSBASE/$DEPS"
           if [ -n "$DEPS" ] && [ -d "$DEPSPATH" ] ; then
                   apt-get install --assume-yes apt-utils
