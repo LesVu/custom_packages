@@ -1,0 +1,160 @@
+name: Build Mesa
+
+on:
+  workflow_dispatch:
+
+jobs:
+  blender-debian:
+    name: Build latest mesa on arm64
+    runs-on: self-hosted
+
+    steps:
+      - name: checkout
+        uses: actions/checkout@v3
+
+      # - name: checkout mesa and deps
+      #   run: |
+      #     # git clone --recursive --depth 1 -b libdrm-2.4.117-1 https://salsa.debian.org/xorg-team/lib/libdrm.git
+      #     # git clone --recursive --depth 1 -b wayland-1.22.0-2 https://salsa.debian.org/xorg-team/wayland/wayland.git
+      #     # git clone --recursive --depth 1 -b debian/1.32-1 https://salsa.debian.org/xorg-team/wayland/wayland-protocols.git
+
+      - name: Setup build
+        run: |
+          export DEBIAN_FRONTEND=noninteractive
+          git config --global http.postBuffer 157286400
+          sudo cat <<EOF > "/etc/apt/sources.list"
+          deb-src http://deb.debian.org/debian/ unstable main
+          EOF
+          apt-get update && apt-get install -q -y \
+          git build-essential apt-utils git-buildpackage dh-autoreconf quilt dh-ocaml time libz3-dev pbuilder devscripts
+          mkdir build-package
+          cd build-package
+          apt-get source directx-headers rust-bindgen-cli spirv-headers spirv-llvm-translator-17 mesa
+          cd ..
+
+          cat <<'EOF' > "command.sh"
+          #!/bin/bash
+          apt-get install wget ca-certificates gnupg -y -q
+          wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add -
+          cat <<EndO2 > "/etc/apt/sources.list"
+          deb http://deb.debian.org/debian/ bookworm contrib main
+          deb-src http://deb.debian.org/debian/ unstable contrib main
+          deb http://apt.llvm.org/bookworm/ llvm-toolchain-bookworm-17 main
+          EndO2
+          apt-get update
+          EOF
+
+          rm -rf /var/cache/pbuilder/*.cow
+
+          sudo cat <<'EOF' > "/etc/pbuilderrc"
+          # the hook dir may already be set/populated!
+          HOOKDIR="/etc/pbuilder/hook.d"
+          if [ -n "$DEPS" ] ; then
+                  export DEPSBASE=/var/cache/pbuilder/deps
+                  BINDMOUNTS=$DEPSBASE
+          fi
+          EOF
+          sudo mkdir -p /etc/pbuilder/hook.d/
+          sudo cat <<'EOF' > "/etc/pbuilder/hook.d/D10apt-ftparchive"
+          DEPSPATH="$DEPSBASE/$DEPS"
+          if [ -n "$DEPS" ] && [ -d "$DEPSPATH" ] ; then
+                  apt-get install --assume-yes apt-utils
+                  ( cd "$DEPSPATH"; apt-ftparchive packages . > Packages )
+                  echo "deb [trusted=yes] file://$DEPSPATH ./" >> /etc/apt/sources.list
+                  apt-get update
+          fi
+          EOF
+          sudo chmod +x /etc/pbuilder/hook.d/D10apt-ftparchive
+          pbuilder create --distribution bookworm
+          pbuilder execute --save-after-exec ./command.sh
+
+          sudo mkdir -p /var/cache/pbuilder/deps/debian
+          sudo cp debian/pool/*.deb /var/cache/pbuilder/deps/debian
+          DIST=bookworm git-pbuilder create --mirror http://deb.debian.org/debian
+          cowbuilder execute --basepath /var/cache/pbuilder/base-bookworm.cow --distribution bookworm --save-after-exec -- ./command.sh
+
+      - name: Build
+        run: |
+          cd build-package
+          # pbuilder build directx-headers*.dsc
+          # pbuilder build spirv-headers*.dsc
+          # cp -r /var/cache/pbuilder/result/*.deb /var/cache/pbuilder/deps/debian
+
+          DEPS=debian pbuilder build spirv-llvm-translator-17*.dsc
+          sudo cp -r /var/cache/pbuilder/result/*.deb /var/cache/pbuilder/deps/debian
+
+          cd mesa-*
+          sed -i 's/RUSTICL_ARCHS = amd64 arm64 armel armhf i386 loong64 mips64el powerpc ppc64 ppc64el riscv64 s390x x32/RUSTICL_ARCHS = amd64/' debian/rules
+          sed -i 's/bindgen (>= 0.66.1~)/bindgen (>= 0.60.1~)/' debian/control
+          sed -i 's/bindgen (>= 0.66.1~)/bindgen (>= 0.60.1~)/' debian/control.in
+          DEPS=debian pdebuild
+          cd ..
+
+      # cd libdrm
+      # gbp buildpackage --git-upstream-signatures=off --git-ignore-branch -i -us -uc -b
+      # cd ..
+      # cd wayland
+      # gbp buildpackage --git-upstream-signatures=off --git-ignore-branch -i -us -uc -b
+      # cd ..
+      # cd wayland-protocols
+      # gbp buildpackage --git-upstream-signatures=off --git-ignore-branch -i -us -uc -b
+      # cd ..
+      # cd directx-headers
+      # gbp buildpackage --git-upstream-signatures=off --git-ignore-branch -i -us -uc -b
+      # cd ..
+      # cd debcargo-conf
+      # ./repackage.sh bindgen-cli
+      # cd build
+      # gbp buildpackage --git-upstream-signatures=off --git-ignore-branch -i -us -uc -b
+      # cd ../../
+      # cd spirv-headers
+      # gbp buildpackage --git-upstream-signatures=off --git-ignore-branch -i -us -uc -b
+      # cd ..
+      # cd spirv-llvm-translator
+      # gbp buildpackage --git-upstream-signatures=off --git-ignore-branch -i -us -uc -b
+      # cd ..
+      # cp *.deb debian/pool
+      # cd mesa
+      # DEPS=debian gbp buildpackage --git-upstream-tree="mesa-23.3.2-1" --git-upstream-signatures=off --git-ignore-branch --git-pbuilder --git-dist=bookworm -i -us -uc -b
+      # cd ..
+      # ls -lah
+
+      - name: Move to debian repo
+        run: |
+          cp build-package/*.deb debian/pool
+          cp /var/cache/pbuilder/result/*.deb debian/pool
+          rm -f debian/pool/*-dbg*.deb
+
+      - name: Import GPG key
+        uses: crazy-max/ghaction-import-gpg@v5
+        with:
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+
+      - name: List GPG keys
+        run: gpg -K
+
+      - name: Write new package to repo
+        run: |
+          cd $GITHUB_WORKSPACE/debian
+          rm Packages || echo "Failed to remove packages file"
+          rm Packages.gz || echo "Failed to remove packages.gz file"
+          rm Release || echo "Failed to remove release file"
+          rm Release.gpg || echo "Failed to remove release.gpg file"
+          rm InRelease || echo "Failed to remove inrelease file"
+          dpkg-scanpackages --multiversion . > Packages
+          gzip -k -f Packages
+          apt-ftparchive release . > Release
+          gpg --default-key LesVu -abs -o - Release > Release.gpg || error "failed to sign Release.gpg with gpg "
+          gpg --default-key LesVu --clearsign -o - Release > InRelease || error "failed to sign InRelease with gpg"
+
+      - name: Commit and push
+        uses: stefanzweifel/git-auto-commit-action@v4
+        with:
+          file_pattern: 'debian/*'
+
+      - name: Upload Artifact
+        if: failure()
+        uses: actions/upload-artifact@v3
+        with:
+          name: mesa
+          path: ./*.deb
