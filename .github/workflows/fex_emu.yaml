@@ -17,6 +17,7 @@ jobs:
         with:
           repository: "LesVu/custom_debian_repo"
           path: "debian"
+          token: ${{ secrets.PAT }}
 
       - name: checkout Neovim
         uses: actions/checkout@v4

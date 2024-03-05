@@ -27,6 +27,7 @@ jobs:
         with:
           repository: "LesVu/custom_debian_repo"
           path: "debian"
+          token: ${{ secrets.PAT }}
 
       - name: Get Date
         id: get-date
