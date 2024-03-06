@@ -24,7 +24,7 @@ jobs:
         with:
           repository: FEX-Emu/FEX
           path: fex
-          ref: FEX-2312
+          ref: FEX-2403
           submodules: recursive
 
       - name: Get Date
@@ -50,8 +50,7 @@ jobs:
           libgcc-12-dev-i386-cross libgcc-12-dev-amd64-cross nasm python3-clang \
           libstdc++-12-dev-i386-cross libstdc++-12-dev-amd64-cross libstdc++-12-dev-arm64-cross \
           squashfs-tools squashfuse libc-bin libc6-dev-i386-amd64-cross \
-          lib32stdc++-12-dev-amd64-cross apt-utils \
-          && sudo rm -rf /var/lib/apt/lists/*
+          lib32stdc++-12-dev-amd64-cross apt-utils
 
       - name: Build
         run: |
