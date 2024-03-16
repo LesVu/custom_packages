@@ -109,11 +109,11 @@ jobs:
           if [[ "$input_string" == *" "* ]]; then
             IFS=" " read -ra words <<< "$input_string"
             for word in "${words[@]}"; do
-              DEPS=debian sudo pbuilder build ${{ inputs.options }} ${word}*.dsc
+              DEPS=debian pbuilder build ${{ inputs.options }} ${word}*.dsc
               sudo cp -r /var/cache/pbuilder/result/*.deb /var/cache/pbuilder/deps/debian
             done
           else
-            DEPS=debian sudo pbuilder build ${{ inputs.options }} ${input_string}*.dsc
+            DEPS=debian pbuilder build ${{ inputs.options }} ${input_string}*.dsc
           fi
 
       - name: Import GPG key
@@ -128,7 +128,7 @@ jobs:
         run: |
           cd $GITHUB_WORKSPACE/debian
           reprepro -V -b ./debian --confdir ./conf --section other -C main includedeb bookworm /var/cache/pbuilder/result/*.deb || echo "Failed to remove packages file"
-          rm -rf /var/cache/pbuilder/result/*
+          sudo rm -rf /var/cache/pbuilder/result/*
 
       - name: Commit and push
         uses: stefanzweifel/git-auto-commit-action@v5
