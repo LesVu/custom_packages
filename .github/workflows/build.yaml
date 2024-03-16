@@ -109,11 +109,11 @@ jobs:
           if [[ "$input_string" == *" "* ]]; then
             IFS=" " read -ra words <<< "$input_string"
             for word in "${words[@]}"; do
-              DEPS=debian pbuilder build ${{ inputs.options }} ${word}*.dsc
+              DEPS=debian sudo pbuilder build ${{ inputs.options }} ${word}*.dsc
               sudo cp -r /var/cache/pbuilder/result/*.deb /var/cache/pbuilder/deps/debian
             done
           else
-            DEPS=debian pbuilder build ${{ inputs.options }} ${input_string}*.dsc
+            DEPS=debian sudo pbuilder build ${{ inputs.options }} ${input_string}*.dsc
           fi
 
       - name: Import GPG key
