@@ -1,0 +1,240 @@
+diff --git a/base/Cargo.toml b/base/Cargo.toml
+index cdaaf10c0..307253e7d 100644
+--- a/base/Cargo.toml
++++ b/base/Cargo.toml
+@@ -42,6 +42,7 @@ protos = { path = "../protos", features = ["composite-disk"] }
+ 
+ [target.'cfg(any(target_os = "android", target_os = "linux"))'.dependencies]
+ minijail = "*"
++android_log-sys = "0.3.1"
+ 
+ [target.'cfg(windows)'.dependencies]
+ protobuf = "3.2"
+diff --git a/build-termux.sh b/build-termux.sh
+new file mode 100755
+index 000000000..59b3b7659
+--- /dev/null
++++ b/build-termux.sh
+@@ -0,0 +1,6 @@
++#!/data/data/com.termux/files/usr/bin/bash
++export RUSTFLAGS="-C link-arg=-landroid-cutils" 
++
++export CFLAGS="-llog -landroid-cutils -Wno-unused-command-line-argument -target aarch64-unknown-linux-android30" 
++
++cargo build --features "android-sparse audio_cras composite-disk crash-report default ffmpeg gdb geniezone gfxstream gfxstream_stub libvda-stub net noncoherent-dma pci-hotplug power-monitor-powerd registered_events slirp swap trace_marker video-decoder video-encoder virgl_renderer vtpm wl-dmabuf balloon gunyah vulkano qcow usb audio vulkan_display default-no-sandbox" --release
+diff --git a/rutabaga_gfx/Cargo.toml b/rutabaga_gfx/Cargo.toml
+index 99172e3ca..1bb1089eb 100644
+--- a/rutabaga_gfx/Cargo.toml
++++ b/rutabaga_gfx/Cargo.toml
+@@ -13,7 +13,7 @@ virgl_renderer = []
+ minigbm = []
+ # To try out Vulkano, delete the following line and uncomment the line in "dependencies". Vulkano
+ # features are just a prototype and not integrated yet into the ChromeOS build system.
+-vulkano = []
++# vulkano = []
+ x = []
+ 
+ [dependencies]
+@@ -26,7 +26,7 @@ zerocopy = { version = "0.7", features = ["derive"] }
+ log = "0.4"
+ 
+ # To build latest Vulkano, change version to git = "https://github.com/vulkano-rs/vulkano.git"
+-# vulkano = { version = "0.31.0", optional = true }
++vulkano = { version = "0.31.0", optional = true }
+ 
+ [target.'cfg(any(target_os = "android", target_os = "linux"))'.dependencies]
+ nix = { version = "0.27.1", features = ["event", "feature", "fs", "mman", "socket", "uio", "ioctl"] }
+diff --git a/src/crosvm/sys/linux/android.rs b/src/crosvm/sys/linux/android.rs
+index d1eefa527..b9b7c1183 100644
+--- a/src/crosvm/sys/linux/android.rs
++++ b/src/crosvm/sys/linux/android.rs
+@@ -11,15 +11,15 @@ use anyhow::anyhow;
+ use anyhow::Result;
+ use libc;
+ 
+-#[link(name = "processgroup")]
+-extern "C" {
+-    fn android_set_process_profiles(
+-        uid: libc::uid_t,
+-        pid: libc::pid_t,
+-        num_profiles: libc::size_t,
+-        profiles: *const *const libc::c_char,
+-    ) -> bool;
+-}
++// #[link(name = "processgroup")]
++// extern "C" {
++//     fn android_set_process_profiles(
++//         uid: libc::uid_t,
++//         pid: libc::pid_t,
++//         num_profiles: libc::size_t,
++//         profiles: *const *const libc::c_char,
++//     ) -> bool;
++// }
+ 
+ // Apply the listed task profiles to all tasks (current and future) in this process.
+ pub fn set_process_profiles(profiles: &Vec<String>) -> Result<()> {
+@@ -34,7 +34,7 @@ pub fn set_process_profiles(profiles: &Vec<String>) -> Result<()> {
+     // SAFETY: the ownership of the array of string is not passed. The function copies it
+     // internally.
+     unsafe {
+-        if (android_set_process_profiles(libc::getuid(), libc::getpid(), ptrs.len(), ptrs.as_ptr()))
++        if (/* android_set_process_profiles(libc::getuid(), libc::getpid(), ptrs.len(), ptrs.as_ptr())*/ true)
+         {
+             Ok(())
+         } else {
+diff --git a/swap/Cargo.toml b/swap/Cargo.toml
+index 3833a6e69..58dd88ed4 100644
+--- a/swap/Cargo.toml
++++ b/swap/Cargo.toml
+@@ -33,8 +33,6 @@ vm_memory = { path = "../vm_memory" }
+ 
+ [target.'cfg(any(target_os = "android", target_os = "linux"))'.dependencies]
+ libc = "*"
+-
+-[target.'cfg(target_os="linux")'.dependencies]
+ userfaultfd = { version = "0.8.1", optional = true }
+ userfaultfd-sys = { version = "0.5.0", optional = true }
+ 
+diff --git a/tools/install-deps b/tools/install-deps
+index bc74b1347..a30e08171 100755
+--- a/tools/install-deps
++++ b/tools/install-deps
+@@ -4,97 +4,80 @@
+ # found in the LICENSE file.
+ set -ex
+ 
+-sudo apt-get install --yes --no-install-recommends \
+-    black \
++apt-get install --yes \
+     ca-certificates \
+     clang \
+-    cloud-image-utils \
++    rust \
+     curl \
+-    dpkg-dev \
+     expect \
+-    g++ \
+-    gcc \
+     git \
+     jq \
+-    libavcodec-dev \
+-    libavutil-dev \
+-    libcap-dev \
+-    libclang-dev \
+-    libdbus-1-dev \
+-    libdrm-dev \
+-    libepoxy-dev \
+-    libglib2.0-dev \
+-    libguestfs-tools \
+-    libslirp-dev \
+-    libssl-dev \
+-    libswscale-dev \
+-    libva-dev \
+-    libwayland-dev \
+-    libxext-dev \
++    ffmpeg \
++    libcap \
++    dbus \
++    libdrm \
++    libepoxy \
++    glib \
++    libslirp \
++    openssl \
++    libwayland \
++    libxext \
+     lld \
+     make \
+-    meson \
+-    mypy \
++    mesa \
+     nasm \
+-    ncat \
+-    ninja-build \
+-    openssh-client \
+-    pipx \
++    nmap-ncat \
++    ninja \
++    openssh \
+     pkg-config \
+-    protobuf-compiler \
+-    python3 \
+-    python3-argh \
+-    python3-pip \
+-    python3-rich \
+-    qemu-system-x86 \
++    protobuf \
++    python \
++    python-pip \
+     rsync \
+     screen \
+     strace \
+     tmux \
+-    wayland-protocols \
+-    wget
++    libwayland-protocols \
++    wget \
++    libglvnd-dev \
++    glfw \
++    libx11 \
++    mesa \
++    xorgproto
++
++pip install black meson argh rich pipx mypy
+ 
+ # mdformat is not available as a debian package. Install via pipx instead.
+ pipx install mdformat
+ pipx inject mdformat mdformat-gfm mdformat-footnote
+ pipx ensurepath
+ 
+-# Install rustup if not available yet
+-if ! command -v rustup &>/dev/null; then
+-    wget "https://static.rust-lang.org/rustup/archive/1.25.1/x86_64-unknown-linux-gnu/rustup-init"
+-    echo "5cc9ffd1026e82e7fb2eec2121ad71f4b0f044e88bca39207b3f6b769aaa799c *rustup-init" | sha256sum -c -
+-    chmod +x rustup-init
+-    ./rustup-init -y --no-modify-path --profile minimal --default-toolchain none
+-    source ${CARGO_HOME:-~/.cargo}/env
+-    rm rustup-init
+-fi
+-
+ # Install required rust components.
+ # This will also ensure the toolchain required by ./rust-toolchain is installed.
+-rustup component add cargo clippy rustfmt
++#rustup component add cargo clippy rustfmt
+ 
+ # LLVM tools are used to generate and process coverage files
+-rustup component add llvm-tools-preview
++#rustup component add llvm-tools-preview
+ 
+ # Allow cross-compilation via mingw64
+-rustup target add x86_64-pc-windows-gnu
++#rustup target add x86_64-pc-windows-gnu
+ 
+ # Install nightly toolchain. Only used for rustfmt
+-rustup toolchain install nightly --profile minimal --component rustfmt
++#rustup toolchain install nightly --profile minimal --component rustfmt
+ 
+ # Cargo extension to install binary packages from github
+-curl -L https://github.com/cargo-bins/cargo-binstall/releases/download/v1.4.4/cargo-binstall-x86_64-unknown-linux-gnu.tgz | tar -xzvvf - -C ${CARGO_HOME:-~/.cargo}/bin
++# curl -L https://github.com/cargo-bins/cargo-binstall/releases/download/v1.4.4/cargo-binstall-x86_64-unknown-linux-gnu.tgz | tar -xzvvf - -C ${CARGO_HOME:-~/.cargo}/bin
+ 
+ # The bindgen tool is required to build a crosvm dependency.
+-cargo binstall --no-confirm bindgen-cli --version "0.68.1"
++cargo install bindgen-cli --version "0.68.1"
+ 
+ # binutils are wrappers to call the rustup bundled versions of llvm tools.
+-cargo binstall --no-confirm cargo-binutils
++#cargo binstall --no-confirm cargo-binutils
+ 
+ # The mdbook and mdbook-mermaid tools are used to build the crosvm book.
+-cargo binstall --no-confirm mdbook --version "0.4.25"
+-cargo binstall --no-confirm mdbook-mermaid --version "0.12.6"
+-cargo binstall --no-confirm mdbook-linkcheck --version "0.7.7"
+-
+-# Nextest is an improved test runner for cargo
+-cargo binstall --no-confirm cargo-nextest --version "0.9.49"
++# cargo binstall --no-confirm mdbook --version "0.4.25"
++# cargo binstall --no-confirm mdbook-mermaid --version "0.12.6"
++# cargo binstall --no-confirm mdbook-linkcheck --version "0.7.7"
++#
++# # Nextest is an improved test runner for cargo
++# cargo binstall --no-confirm cargo-nextest --version "0.9.49"
