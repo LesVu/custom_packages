@@ -1,3 +1,28 @@
+diff --git a/Cargo.lock b/Cargo.lock
+index eb69daa23..555696de4 100644
+--- a/Cargo.lock
++++ b/Cargo.lock
+@@ -46,6 +46,12 @@ dependencies = [
+  "memchr",
+ ]
+ 
++[[package]]
++name = "android_log-sys"
++version = "0.3.1"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "5ecc8056bf6ab9892dcd53216c83d1597487d7dacac16c8df6b877d127df9937"
++
+ [[package]]
+ name = "anti_tamper"
+ version = "0.1.0"
+@@ -226,6 +232,7 @@ dependencies = [
+ name = "base"
+ version = "0.1.0"
+ dependencies = [
++ "android_log-sys",
+  "audio_streams",
+  "base_event_token_derive",
+  "cfg-if",
 diff --git a/base/Cargo.toml b/base/Cargo.toml
 index cdaaf10c0..307253e7d 100644
 --- a/base/Cargo.toml
@@ -12,76 +37,53 @@ index cdaaf10c0..307253e7d 100644
  protobuf = "3.2"
 diff --git a/build-termux.sh b/build-termux.sh
 new file mode 100755
-index 000000000..59b3b7659
+index 000000000..168706b45
 --- /dev/null
 +++ b/build-termux.sh
 @@ -0,0 +1,6 @@
 +#!/data/data/com.termux/files/usr/bin/bash
-+export RUSTFLAGS="-C link-arg=-landroid-cutils" 
++export RUSTFLAGS="-C link-arg=-landroid-cutils"
 +
-+export CFLAGS="-llog -landroid-cutils -Wno-unused-command-line-argument -target aarch64-unknown-linux-android30" 
++export CFLAGS="-llog -landroid-cutils -Wno-unused-command-line-argument -target aarch64-unknown-linux-android30"
 +
-+cargo build --features "android-sparse audio_cras composite-disk crash-report default ffmpeg gdb geniezone gfxstream gfxstream_stub libvda-stub net noncoherent-dma pci-hotplug power-monitor-powerd registered_events slirp swap trace_marker video-decoder video-encoder virgl_renderer vtpm wl-dmabuf balloon gunyah vulkano qcow usb audio vulkan_display default-no-sandbox" --release
-diff --git a/rutabaga_gfx/Cargo.toml b/rutabaga_gfx/Cargo.toml
-index 99172e3ca..1bb1089eb 100644
---- a/rutabaga_gfx/Cargo.toml
-+++ b/rutabaga_gfx/Cargo.toml
-@@ -13,7 +13,7 @@ virgl_renderer = []
- minigbm = []
- # To try out Vulkano, delete the following line and uncomment the line in "dependencies". Vulkano
- # features are just a prototype and not integrated yet into the ChromeOS build system.
--vulkano = []
-+# vulkano = []
- x = []
- 
- [dependencies]
-@@ -26,7 +26,7 @@ zerocopy = { version = "0.7", features = ["derive"] }
- log = "0.4"
- 
- # To build latest Vulkano, change version to git = "https://github.com/vulkano-rs/vulkano.git"
--# vulkano = { version = "0.31.0", optional = true }
-+vulkano = { version = "0.31.0", optional = true }
- 
- [target.'cfg(any(target_os = "android", target_os = "linux"))'.dependencies]
- nix = { version = "0.27.1", features = ["event", "feature", "fs", "mman", "socket", "uio", "ioctl"] }
-diff --git a/src/crosvm/sys/linux/android.rs b/src/crosvm/sys/linux/android.rs
-index d1eefa527..b9b7c1183 100644
---- a/src/crosvm/sys/linux/android.rs
-+++ b/src/crosvm/sys/linux/android.rs
-@@ -11,15 +11,15 @@ use anyhow::anyhow;
- use anyhow::Result;
- use libc;
- 
--#[link(name = "processgroup")]
--extern "C" {
--    fn android_set_process_profiles(
--        uid: libc::uid_t,
--        pid: libc::pid_t,
--        num_profiles: libc::size_t,
--        profiles: *const *const libc::c_char,
--    ) -> bool;
--}
-+// #[link(name = "processgroup")]
-+// extern "C" {
-+//     fn android_set_process_profiles(
-+//         uid: libc::uid_t,
-+//         pid: libc::pid_t,
-+//         num_profiles: libc::size_t,
-+//         profiles: *const *const libc::c_char,
-+//     ) -> bool;
-+// }
- 
- // Apply the listed task profiles to all tasks (current and future) in this process.
- pub fn set_process_profiles(profiles: &Vec<String>) -> Result<()> {
-@@ -34,7 +34,7 @@ pub fn set_process_profiles(profiles: &Vec<String>) -> Result<()> {
-     // SAFETY: the ownership of the array of string is not passed. The function copies it
-     // internally.
-     unsafe {
--        if (android_set_process_profiles(libc::getuid(), libc::getpid(), ptrs.len(), ptrs.as_ptr()))
-+        if (/* android_set_process_profiles(libc::getuid(), libc::getpid(), ptrs.len(), ptrs.as_ptr())*/ true)
-         {
-             Ok(())
-         } else {
++cargo build --features "android-sparse audio_cras config-file composite-disk crash-report default ffmpeg gdb geniezone gfxstream gfxstream_stub libvda-stub net noncoherent-dma pci-hotplug power-monitor-powerd registered_events slirp swap trace_marker video-decoder video-encoder virgl_renderer vtpm wl-dmabuf balloon gunyah qcow usb audio default-no-sandbox" --release
+diff --git a/jail/build.rs b/jail/build.rs
+index eb4f12eff..f4ec2cf85 100644
+--- a/jail/build.rs
++++ b/jail/build.rs
+@@ -38,13 +38,25 @@ fn compile_policy(
+             .file_name()
+             .unwrap(),
+     );
+-    let status = Command::new(compile_script)
+-        .arg("--arch-json")
+-        .arg(output_folder.join("constants.json"))
+-        .arg("--default-action")
+-        .arg("trap")
+-        .arg(policy_file.path())
+-        .arg(&output_file_path)
++    let status = Command::new("bash")
++.arg("-c")
++.arg(format!("{} {} {} {} {} {} {}", 
++    compile_script.to_string_lossy(),
++    "--arch-json",
++    output_folder.join("constants.json").to_string_lossy(),
++    "--default-action",
++    "trap",
++    policy_file.path().to_string_lossy(),
++    &output_file_path.to_string_lossy()
++))
++        // .arg("-c")
++        // .arg(compile_script)
++        // .arg("--arch-json")
++        // .arg(output_folder.join("constants.json"))
++        // .arg("--default-action")
++        // .arg("trap")
++        // .arg(policy_file.path())
++        // .arg(&output_file_path)
+         .spawn()
+         .unwrap()
+         .wait()
 diff --git a/swap/Cargo.toml b/swap/Cargo.toml
 index 3833a6e69..58dd88ed4 100644
 --- a/swap/Cargo.toml
