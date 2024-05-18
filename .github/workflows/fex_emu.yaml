@@ -24,7 +24,7 @@ jobs:
         with:
           repository: FEX-Emu/FEX
           path: fex
-          ref: FEX-2403
+          ref: FEX-2405
           submodules: recursive
 
       - name: Get Date
