@@ -46,7 +46,7 @@ jobs:
       - name: Install Build deps
         run: |
           sudo apt-get update && sudo apt-get install -q -y \
-          git jq build-essential ccache libtool-bin tar unzip ninja-build gettext cmake unzip \
+          git reprepro jq build-essential ccache libtool-bin tar unzip ninja-build gettext cmake unzip \
           software-properties-common curl libunibilium-dev
 
       - name: Build
@@ -64,10 +64,6 @@ jobs:
           path: ~/.ccache
           key: neovim_arm64-ccache-${{ steps.get-date.outputs.date }}
 
-      - name: Move to debian repo
-        run: |
-          mv artifacts/*.deb debian/debian/pool
-
       - name: Import GPG key
         uses: crazy-max/ghaction-import-gpg@v6
         with:
@@ -78,17 +74,9 @@ jobs:
 
       - name: Write new package to repo
         run: |
-          cd $GITHUB_WORKSPACE/debian/debian
-          rm Packages || echo "Failed to remove packages file"
-          rm Packages.gz || echo "Failed to remove packages.gz file"
-          rm Release || echo "Failed to remove release file"
-          rm Release.gpg || echo "Failed to remove release.gpg file"
-          rm InRelease || echo "Failed to remove inrelease file"
-          dpkg-scanpackages --multiversion . > Packages
-          gzip -k -f Packages
-          apt-ftparchive release . > Release
-          gpg --default-key LesVu -abs -o - Release > Release.gpg || error "failed to sign Release.gpg with gpg "
-          gpg --default-key LesVu --clearsign -o - Release > InRelease || error "failed to sign InRelease with gpg"
+          cd $GITHUB_WORKSPACE/debian
+          reprepro -V -b ./debian --confdir ./conf --section other -C main includedeb bookworm ../artifacts/*.deb || echo "Failed to write new packages file"
+          rm -rf ../artifacts/
 
       - name: Commit and push
         uses: stefanzweifel/git-auto-commit-action@v5

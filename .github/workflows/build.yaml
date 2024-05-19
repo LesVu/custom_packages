@@ -127,7 +127,7 @@ jobs:
       - name: Write new package to repo
         run: |
           cd $GITHUB_WORKSPACE/debian
-          reprepro -V -b ./debian --confdir ./conf --section other -C main includedeb bookworm /var/cache/pbuilder/result/*.deb || echo "Failed to remove packages file"
+          reprepro -V -b ./debian --confdir ./conf --section other -C main includedeb bookworm /var/cache/pbuilder/result/*.deb || echo "Failed to write new packages file"
           sudo rm -rf /var/cache/pbuilder/result/*
 
       - name: Commit and push
