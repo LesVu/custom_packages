@@ -72,22 +72,16 @@ jobs:
           sudo cat <<'EOF' | sudo tee "/etc/pbuilderrc" >/dev/null 
           # the hook dir may already be set/populated!
           HOOKDIR="/etc/pbuilder/hook.d"
-          if [ -n "$DEPS" ] ; then
-                  export DEPSBASE=/var/cache/pbuilder/deps
-                  BINDMOUNTS=$DEPSBASE
-          fi
+          export DEPS=/var/cache/pbuilder/deps/debian
+          BINDMOUNTS=$DEPS
           EOF
           sudo mkdir -p /etc/pbuilder/hook.d/
           sudo cat <<'EOF' | sudo tee "/etc/pbuilder/hook.d/D10apt-ftparchive" >/dev/null 
-          DEPSPATH="$DEPSBASE/$DEPS"
-          echo $DEPSPATH $DEPSBASE $DEPS
-          if [ -n "$DEPS" ] && [ -d "$DEPSPATH" ] ; then
-            apt-get install --assume-yes apt-utils
-            ( cd "$DEPSPATH"; apt-ftparchive packages . > Packages )
-            echo "deb [trusted=yes] file://$DEPSPATH ./" >> /etc/apt/sources.list
-            echo "deb [trusted=yes] https://lesvu.github.io/custom_debian_repo/debian bookworm main" >> /etc/apt/sources.list
-            apt-get update
-          fi
+          apt-get install --assume-yes apt-utils
+          ( cd "$DEPS"; apt-ftparchive packages . > Packages )
+          echo "deb [trusted=yes] file://$DEPS ./" >> /etc/apt/sources.list
+          echo "deb [trusted=yes] https://lesvu.github.io/custom_debian_repo/debian bookworm main" >> /etc/apt/sources.list
+          apt-get update
           EOF
           sudo chmod +x /etc/pbuilder/hook.d/D10apt-ftparchive
           sudo rm -rf /var/cache/pbuilder/deps/debian
@@ -102,7 +96,6 @@ jobs:
 
       - name: Build
         run: |
-
           cd build-package
           # pbuilder build binutils*.dsc
           # cp /var/cache/pbuilder/result/*.deb /var/cache/pbuilder/deps/debian
@@ -110,11 +103,11 @@ jobs:
           if [[ "$input_string" == *" "* ]]; then
             IFS=" " read -ra words <<< "$input_string"
             for word in "${words[@]}"; do
-              DEPS=debian sudo pbuilder build ${{ inputs.options }} ${word}*.dsc
+              sudo pbuilder build ${{ inputs.options }} ${word}*.dsc
               sudo cp -r /var/cache/pbuilder/result/*.deb /var/cache/pbuilder/deps/debian
             done
           else
-            DEPS=debian sudo pbuilder build ${{ inputs.options }} ${input_string}*.dsc
+            sudo pbuilder build ${{ inputs.options }} ${input_string}*.dsc
           fi
 
       - name: Import GPG key
