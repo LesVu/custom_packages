@@ -80,6 +80,7 @@ jobs:
           sudo mkdir -p /etc/pbuilder/hook.d/
           sudo cat <<'EOF' | sudo tee "/etc/pbuilder/hook.d/D10apt-ftparchive" >/dev/null 
           DEPSPATH="$DEPSBASE/$DEPS"
+          echo $DEPSPATH $DEPSBASE $DEPS
           if [ -n "$DEPS" ] && [ -d "$DEPSPATH" ] ; then
             apt-get install --assume-yes apt-utils
             ( cd "$DEPSPATH"; apt-ftparchive packages . > Packages )
