@@ -1,17 +1,48 @@
 name: Build Fex
 
 on:
+  schedule:
+    # * is a special character in YAML so you have to quote this string
+    - cron: "0 0 1 * *"
   workflow_dispatch:
 
 jobs:
-  fex-debian:
+  check-version:
+    name: Check current up to date or not.
+    runs-on: ubuntu-latest
+    outputs:
+      LATEST: ${{ steps.checks.outputs.LATEST }}
+      VERSION: ${{ steps.checks.outputs.VERSION }}
+    steps:
+      - name: Check update
+        id: checks
+        run: |
+          CURRENT_VERSION=$(curl -s https://raw.githubusercontent.com/LesVu/custom_debian_repo/main/debian/dists/bookworm/main/binary-arm64/Packages |\
+          awk '/^Package: fex-emu/ {flag=1} flag && /^Version:/ {print $2; flag=0}' |\
+          cut -d'.' -f1)
+          LATEST_VERSION=$(curl -s https://api.github.com/repos/FEX-Emu/FEX/releases/latest |\
+          jq -r '.tag_name')
+          LATEST_VERSION_CUT=${LATEST_VERSION#FEX-}
+          if [ "$CURRENT_VERSION" == "$LATEST_VERSION_CUT" ]; then
+            echo "LATEST=True" >> "$GITHUB_OUTPUT"
+          else
+            echo "LATEST=False" >> "$GITHUB_OUTPUT"
+            echo "VERSION=$LATEST_VERSION" >> "$GITHUB_OUTPUT"
+          fi
+          echo "CURRENT_VERSION=$CURRENT_VERSION"
+          echo "LATEST_VERSION_CUT=$LATEST_VERSION_CUT"
+          echo "LATEST_VERSION=$LATEST_VERSION"
+
+  build-fex:
     name: Build package on arm64
+    needs: [check-version]
+    if: needs.check-version.outputs.LATEST == 'False'
     runs-on: self-hosted
 
     steps:
       - name: checkout
         uses: actions/checkout@v4
-
+      
       - name: checkout deb repo
         uses: actions/checkout@v4
         with:
@@ -24,23 +55,8 @@ jobs:
         with:
           repository: FEX-Emu/FEX
           path: fex
-          ref: FEX-2405
+          ref: ${{ needs.check-version.outputs.VERSION }}
           submodules: recursive
-
-      - name: Get Date
-        id: get-date
-        run: |
-          echo "date=$(TZ='Asia/Singapore' /bin/date "+%I:%M%p_%d/%m/%Y")" >> $GITHUB_OUTPUT
-        shell: bash
-
-      - name: Mkdir
-        run: mkdir -p ~/.ccache
-
-      - name: ccache cache files
-        uses: actions/cache/restore@v4
-        with:
-          path: ~/.ccache
-          key: fex-bookworm-arm64-ccache-
 
       - name: Install deps
         run: |
@@ -62,12 +78,6 @@ jobs:
           ninja
           cpack -G DEB -D CPACK_DEBIAN_PACKAGE_CONFLICTS="qemu-user-static, box64, box86"
           mv *.deb ../../artifacts
-
-      - uses: actions/cache/save@v4
-        if: always()
-        with:
-          path: ~/.ccache
-          key: fex-bookworm-arm64-ccache-${{ steps.get-date.outputs.date }}
 
       - name: Import GPG key
         uses: crazy-max/ghaction-import-gpg@v6
