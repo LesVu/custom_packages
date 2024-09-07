@@ -15,6 +15,9 @@ on:
         required: false
         type: string
         description: "Option passed"
+      test:
+        type: boolean
+        description: "Dry run"
       
 jobs:
   package-debian:
@@ -29,6 +32,7 @@ jobs:
             echo "One of package or git_uri must be specified"
             exit 1
           fi
+          echo ${{ !inputs.test }}
 
       - name: Checkout this repo
         uses: actions/checkout@v4
@@ -134,6 +138,7 @@ jobs:
           sudo rm -rf /var/cache/pbuilder/result/*
 
       - name: Commit and push
+        if: ${{ !inputs.test }}
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           file_pattern: "debian/*"
