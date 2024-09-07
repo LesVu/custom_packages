@@ -1,11 +1,41 @@
 name: Build Neovim
 
 on:
+  schedule:
+    # * is a special character in YAML so you have to quote this string
+    - cron: "0 0 1 * *"
+
   workflow_dispatch:
 
 jobs:
-  neovim-debian:
+ check-version:
+    name: Check current up to date or not.
+    runs-on: ubuntu-latest
+    outputs:
+      LATEST: ${{ steps.checks.outputs.LATEST }}
+      VERSION: ${{ steps.checks.outputs.VERSION }}
+    steps:
+      - name: Check update
+        id: checks
+        run: |
+          CURRENT_VERSION=$(curl -s https://raw.githubusercontent.com/LesVu/custom_debian_repo/main/debian/dists/bookworm/main/binary-arm64/Packages |\
+          awk '/^Package: neovim/ {flag=1} flag && /^Version:/ {print $2; flag=0}')
+          LATEST_VERSION=$(curl -s https://api.github.com/repos/neovim/neovim/releases/latest |\
+          jq -r '.tag_name')
+          LATEST_VERSION_CUT=${LATEST_VERSION#v}
+          if [ "$CURRENT_VERSION" == "$LATEST_VERSION_CUT" ]; then
+            echo "LATEST=True" >> "$GITHUB_OUTPUT"
+          else
+            echo "LATEST=False" >> "$GITHUB_OUTPUT"
+          fi
+          echo "CURRENT_VERSION=$CURRENT_VERSION"
+          echo "LATEST_VERSION_CUT=$LATEST_VERSION_CUT"
+          echo "LATEST_VERSION=$LATEST_VERSION"
+
+ neovim-debian:
     name: Build package on arm64
+    needs: [check-version]
+    if: needs.check-version.outputs.LATEST == 'False'
     runs-on: self-hosted
 
     steps:
