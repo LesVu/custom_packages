@@ -4,26 +4,18 @@ on:
   workflow_dispatch:
     inputs:
       package:
-        required: true
+        required: false
         type: string
         description: "Package specified to build"
-      options:
-        required: false
-        type: string
-        description: Option passed
-      source:
-        description: 'Where to get the source code'
-        required: false
-        default: 'debian_sid'
-        type: choice
-        options:
-          - git
-          - debian_sid
       git_uri:
         required: false
         type: string
-        description: Git repository to build
-
+        description: "Git repository to build"
+      options:
+        required: false
+        type: string
+        description: "Option passed"
+      
 jobs:
   package-debian:
     name: Build package on arm64
@@ -31,32 +23,33 @@ jobs:
     timeout-minutes: 1440
 
     steps:
-      - name: checkout
+      - name: Input checks
+        run: |
+          if [ -z "${{ inputs.package }}" ] && [ -z "${{ inputs.git_uri }}" ]; then
+            echo "One of package or git_uri must be specified"
+            exit 1
+          fi
+
+      - name: Checkout this repo
         uses: actions/checkout@v4
 
-      - name: checkout deb repo
+      - name: Checkout deb repo
         uses: actions/checkout@v4
         with:
           repository: "LesVu/custom_debian_repo"
           path: "debian"
           token: ${{ secrets.PAT }}
 
-      - name: Get Date
-        id: get-date
-        run: |
-          echo "date=$(TZ='Asia/Singapore' /bin/date "+%I:%M%p_%d/%m/%Y")" >> $GITHUB_OUTPUT
-        shell: bash
-
-      - name: Mkdir
+      - name: Make ccache directory
         run: mkdir -p ~/.ccache
 
-      - name: ccache cache files
+      - name: Restore cache files
         uses: actions/cache/restore@v4
         with:
           path: ~/.ccache
-          key: build-bookworm-arm64-ccache-
+          key: build-ccache-
 
-      - name: Install deps
+      - name: Setup
         run: |
           export DEBIAN_FRONTEND=noninteractive
           git config --global http.postBuffer 157286400
@@ -71,9 +64,10 @@ jobs:
           git build-essential apt-utils git-buildpackage dh-autoreconf quilt dh-ocaml time libz3-dev cowbuilder pbuilder reprepro
           mkdir build-package
           cd build-package
-          if [ "${{inputs.source}}" == "git" ]; then
+          if [ -n "${{ inputs.git_uri }}" ]; then
             git clone ${{ inputs.git_uri }}
-          else
+          fi
+          if [ -n "${{ inputs.package }}" ]; then
             apt-get source ${{ inputs.package }}
           fi
           cd ..
@@ -106,27 +100,22 @@ jobs:
         run: |
           cd build-package
           input_string="${{inputs.package}}"
-          if [[ "$input_string" == *" "* ]]; then
-            IFS=" " read -ra words <<< "$input_string"
-            for word in "${words[@]}"; do
-              if [ "${{inputs.source}}" == "git" ]; then
-                cd ${word}*
-                sudo GIT_PBUILDER_AUTOCONF=no GIT_PBUILDER_OPTIONS="${{inputs.options}}" BUILDER=pbuilder gbp buildpackage --git-pbuilder
-                cd ..
-              else
+          if [ -n "${{ inputs.package }}" ]; then
+            if [[ "$input_string" == *" "* ]]; then
+              IFS=" " read -ra words <<< "$input_string"
+              for word in "${words[@]}"; do
                 sudo pbuilder build ${{ inputs.options }} ${word}*.dsc
-              fi
-              sudo rm -f /var/cache/pbuilder/result/*-dbg*.deb
-              sudo cp /var/cache/pbuilder/result/*.deb /var/cache/pbuilder/deps/debian
-            done
-          else
-            if [ "${{inputs.source}}" == "git" ]; then
-              cd ${input_string}*
-              sudo GIT_PBUILDER_AUTOCONF=no GIT_PBUILDER_OPTIONS="${{inputs.options}}" BUILDER=pbuilder gbp buildpackage --git-pbuilder
-              cd ..
+                sudo rm -f /var/cache/pbuilder/result/*-dbg*.deb
+                sudo cp /var/cache/pbuilder/result/*.deb /var/cache/pbuilder/deps/debian
+              done
             else
               sudo pbuilder build ${{ inputs.options }} ${input_string}*.dsc
             fi
+          fi
+          if [ -n "${{ inputs.git_uri }}" ]; then
+              cd ${input_string}*
+              sudo GIT_PBUILDER_AUTOCONF=no GIT_PBUILDER_OPTIONS="${{inputs.options}}" BUILDER=pbuilder gbp buildpackage --git-pbuilder
+              cd ..
           fi
 
       - name: Import GPG key
@@ -150,8 +139,14 @@ jobs:
           file_pattern: "debian/*"
           repository: "debian"
 
-      - uses: actions/cache/save@v4
+      - name: Get Date
+        id: get-date
+        run: echo "date=$(TZ='Asia/Singapore' /bin/date "+%I:%M%p_%d/%m/%Y")" >> $GITHUB_OUTPUT
+        shell: bash
+
+      - name: Save cache
+        uses: actions/cache/save@v4
         if: always()
         with:
           path: ~/.ccache
-          key: build-bookworm-arm64-ccache-${{ steps.get-date.outputs.date }}
+          key: build-ccache-${{ steps.get-date.outputs.date }}

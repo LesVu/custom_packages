@@ -1,14 +1,14 @@
 # Steps
 ## Build it
-`bash
+```bash
 docker build . \
   -f github_runner.dockerfile \
   --build-arg="TOKEN=placeholder" \
   --build-arg="REPO=placeholder" \
   --tag github_self_runner:latest
-`
+```
 ## Run It
-`bash
+```bash
 docker run -itd \
   --init \
   --privileged \
@@ -16,4 +16,4 @@ docker run -itd \
   --dns 1.1.1.1 \
   --dns 1.0.0.1 \
   github_self_runner:latest
-`
+```

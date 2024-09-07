@@ -1,6 +1,6 @@
 FROM debian:bookworm
 ARG TOKEN
-ARG VERSION=2.317.0
+ARG VERSION=2.319.1
 ARG REPO=https://github.com/LesVu/custom_packages
 
 ENV LANG=en_US.UTF-8
