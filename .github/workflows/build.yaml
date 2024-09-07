@@ -66,15 +66,9 @@ jobs:
           EOF
           sudo apt-get update && sudo apt-get install -q -y \
           git build-essential apt-utils git-buildpackage dh-autoreconf quilt dh-ocaml time libz3-dev cowbuilder pbuilder reprepro
-          mkdir build-package
-          cd build-package
-          if [ -n "${{ inputs.git_uri }}" ]; then
-            git clone ${{ inputs.git_uri }}
-          fi
-          if [ -n "${{ inputs.package }}" ]; then
-            apt-get source ${{ inputs.package }}
-          fi
-          cd ..
+      
+      - name: Setup pbuilder
+        run: |
           sudo cat <<'EOF' | sudo tee "/etc/pbuilderrc" >/dev/null 
           # the hook dir may already be set/populated!
           HOOKDIR="/etc/pbuilder/hook.d"
@@ -99,6 +93,18 @@ jobs:
             echo "apt-mark hold hello hello-traditional" > command.sh
             sudo pbuilder execute --save-after-exec ./command.sh
           fi
+
+      - name: Clone source
+        run: |
+          mkdir build-package
+          cd build-package
+          if [ -n "${{ inputs.git_uri }}" ]; then
+            git clone ${{ inputs.git_uri }}
+          fi
+          if [ -n "${{ inputs.package }}" ]; then
+            apt-get source ${{ inputs.package }}
+          fi
+          cd ..
 
       - name: Build
         run: |
@@ -146,6 +152,7 @@ jobs:
 
       - name: Get Date
         id: get-date
+        if: always()
         run: echo "date=$(TZ='Asia/Singapore' /bin/date "+%I:%M%p_%d/%m/%Y")" >> $GITHUB_OUTPUT
         shell: bash
 
