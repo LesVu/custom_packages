@@ -50,7 +50,7 @@ jobs:
           path: "debian"
           token: ${{ secrets.PAT }}
 
-      - name: checkout Neovim
+      - name: checkout Fex
         uses: actions/checkout@v4
         with:
           repository: FEX-Emu/FEX

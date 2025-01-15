@@ -18,7 +18,7 @@ on:
       test:
         type: boolean
         description: "Dry run"
-      
+
 jobs:
   package-debian:
     name: Build package on arm64
@@ -59,22 +59,23 @@ jobs:
           git config --global http.postBuffer 157286400
           sudo cat <<EOF | sudo tee "/etc/apt/sources.list.d/debian_src.sources" >/dev/null
           Types: deb-src
-          URIs: http://deb.debian.org/debian
+          URIs: http://mirror.sg.gs/debian
           Suites: unstable
           Components: main
           Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
           EOF
-          sudo apt-get update && sudo apt-get install -q -y \
-          git build-essential apt-utils git-buildpackage dh-autoreconf quilt dh-ocaml time libz3-dev cowbuilder pbuilder reprepro
-      
-      - name: Setup pbuilder
-        run: |
-          sudo cat <<'EOF' | sudo tee "/etc/pbuilderrc" >/dev/null 
+          sudo cat <<'EOF' | sudo tee "/etc/pbuilderrc" >/dev/null
+          MIRRORSITE=http://mirror.sg.gs/debian
           # the hook dir may already be set/populated!
           HOOKDIR="/etc/pbuilder/hook.d"
           export DEPS=/var/cache/pbuilder/deps/debian
           BINDMOUNTS=$DEPS
           EOF
+          sudo apt-get update && sudo apt-get install -q -y \
+          git build-essential apt-utils git-buildpackage dh-autoreconf quilt dh-ocaml time libz3-dev cowbuilder pbuilder reprepro
+
+      - name: Setup pbuilder
+        run: |
           sudo mkdir -p /etc/pbuilder/hook.d/
           sudo cat <<'EOF' | sudo tee "/etc/pbuilder/hook.d/D10apt-ftparchive" >/dev/null 
           apt-get install --assume-yes apt-utils ca-certificates
